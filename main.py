@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends, HTTPException, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 import asyncio
@@ -13,10 +13,24 @@ from models import SessionLocal, Donation
 
 load_dotenv()
 
-# ====================== LIFESPAN (Fix Deprecation) ======================
+# ====================== SECRET KEY ======================
+SAWERIA_SECRET_KEY = os.getenv("SAWERIA_SECRET_KEY")
+if not SAWERIA_SECRET_KEY:
+    print("⚠️ WARNING: SAWERIA_SECRET_KEY tidak ditemukan di .env!")
+
+# Dependency untuk verifikasi secret
+async def verify_saweria_secret(x_secret_key: str = Depends(lambda: None)):
+    # Ambil dari header (bisa juga pakai Header(...) biar lebih strict)
+    if not x_secret_key or x_secret_key != SAWERIA_SECRET_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing secret key"
+        )
+    return x_secret_key
+
+# ====================== LIFESPAN ======================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     token = os.getenv("DISCORD_TOKEN")
     if token:
         print("🔄 Menjalankan Discord Bot...")
@@ -24,9 +38,7 @@ async def lifespan(app: FastAPI):
     else:
         print("⚠️ DISCORD_TOKEN tidak ditemukan.")
     
-    yield  # Aplikasi berjalan di sini
-    
-    # Shutdown (opsional)
+    yield
     print("🛑 Server sedang shutdown...")
 
 # ====================== FASTAPI ======================
@@ -56,9 +68,12 @@ async def support(ctx):
     
     await ctx.send(embed=embed)
 
-# ====================== SAWERIA WEBHOOK ======================
+# ====================== SAWERIA WEBHOOK (DIPROTEKSI) ======================
 @app.post("/saweria")
-async def saweria_webhook(request: Request):
+async def saweria_webhook(
+    request: Request,
+    secret: str = Depends(verify_saweria_secret)   # <-- proteksi di sini
+):
     try:
         data = await request.json()
         nama = data.get("donator_name", "Anonymous")
@@ -87,7 +102,7 @@ async def saweria_webhook(request: Request):
         print(f"❌ Webhook error: {e}")
         return JSONResponse({"status": "error"}, status_code=400)
 
-# ====================== API FOR WEBSITE ======================
+# ====================== API FOR WEBSITE (Tetap Terbuka) ======================
 @app.get("/api/saweria")
 async def get_donatur():
     db = SessionLocal()
