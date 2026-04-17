@@ -7,13 +7,30 @@ import asyncio
 import os
 from dotenv import load_dotenv
 from sqlalchemy import func
+from contextlib import asynccontextmanager
 
 from models import SessionLocal, Donation
 
 load_dotenv()
 
+# ====================== LIFESPAN (Fix Deprecation) ======================
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    token = os.getenv("DISCORD_TOKEN")
+    if token:
+        print("🔄 Menjalankan Discord Bot...")
+        asyncio.create_task(bot.start(token))
+    else:
+        print("⚠️ DISCORD_TOKEN tidak ditemukan.")
+    
+    yield  # Aplikasi berjalan di sini
+    
+    # Shutdown (opsional)
+    print("🛑 Server sedang shutdown...")
+
 # ====================== FASTAPI ======================
-app = FastAPI(title="OwoBim Support")
+app = FastAPI(title="OwoBim Support", lifespan=lifespan)
 
 # ====================== DISCORD BOT ======================
 intents = discord.Intents.default()
@@ -114,21 +131,11 @@ async def serve_index():
     except FileNotFoundError:
         return HTMLResponse("<h1>index.html tidak ditemukan di folder static/</h1>")
 
-# ====================== STARTUP EVENT (PENTING!) ======================
-@app.on_event("startup")
-async def startup_event():
-    token = os.getenv("DISCORD_TOKEN")
-    if token:
-        print("🔄 Menjalankan Discord Bot...")
-        asyncio.create_task(bot.start(token))
-    else:
-        print("⚠️ DISCORD_TOKEN tidak ditemukan. Bot Discord tidak dijalankan.")
-
 # ====================== RUN ======================
 if __name__ == "__main__":
     import uvicorn
     
-    port = int(os.getenv("PORT", 8080))   # Railway sering pakai 8080
+    port = int(os.getenv("PORT", 8080))
     print(f"🚀 Server berjalan di port {port}")
 
     uvicorn.run(
