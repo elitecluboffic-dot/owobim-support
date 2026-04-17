@@ -19,23 +19,28 @@ SAWERIA_SECRET_KEY = os.getenv("SAWERIA_SECRET_KEY")
 if not SAWERIA_SECRET_KEY:
     print("⚠️ WARNING: SAWERIA_SECRET_KEY tidak ditemukan di .env!")
     print("   Webhook Saweria tidak akan terproteksi!")
+else:
+    print(f"🔐 Secret Key aktif → {SAWERIA_SECRET_KEY[:4]}****")
 
-# Dependency untuk verifikasi secret (Header + Query Param)
+# Dependency yang support Query Parameter (?secret=) lebih prioritas
 async def verify_saweria_secret(
     request: Request,
     x_secret_key: str = Header(None, alias="X-Secret-Key")
 ):
     if not SAWERIA_SECRET_KEY:
-        return  # Mode development: skip proteksi
+        return  # development mode
 
-    secret = x_secret_key
+    # Prioritas 1: Query Parameter ?secret=
+    secret = request.query_params.get("secret")
+
+    # Prioritas 2: Header X-Secret-Key
     if not secret:
-        secret = request.query_params.get("secret")
+        secret = x_secret_key
 
     if not secret or secret != SAWERIA_SECRET_KEY:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unauthorized: Invalid or missing secret key"
+            detail="Unauthorized: Invalid or missing secret key (?secret= atau X-Secret-Key)"
         )
     return secret
 
@@ -84,7 +89,7 @@ async def support(ctx):
     await ctx.send(embed=embed)
 
 
-# ====================== SAWERIA WEBHOOK - FINAL AUTO FIX ======================
+# ====================== SAWERIA WEBHOOK ======================
 @app.post("/saweria")
 async def saweria_webhook(
     request: Request,
@@ -93,13 +98,10 @@ async def saweria_webhook(
     try:
         data = await request.json()
 
-        # LOG FULL PAYLOAD (INI YANG PALING PENTING)
-        print("🔍 [SAWERIA WEBHOOK] Payload diterima:")
+        print("🔍 [SAWERIA] Payload diterima:")
         print(data)
 
-        # Parsing yang lebih aman & fleksibel
         saweria_id = data.get("id")
-
         nama = (
             data.get("donator_name") 
             or data.get("donator") 
@@ -107,24 +109,23 @@ async def saweria_webhook(
             or "Anonymous"
         )
 
-        # Handle nominal (bisa string atau number)
         amount_raw = data.get("amount_raw") or data.get("amount")
         if isinstance(amount_raw, str):
-            nominal = int(float(str(amount_raw).replace(",", "")))
+            nominal = int(float(str(amount_raw).replace(",", "").replace(" ", "")))
         else:
             nominal = int(amount_raw) if amount_raw is not None else 0
 
         pesan = data.get("message") or data.get("note") or ""
 
         if not saweria_id:
-            raise ValueError("Missing 'id' in Saweria payload")
+            raise ValueError("Missing 'id' in payload")
         if nominal <= 0:
             raise ValueError(f"Nominal tidak valid: {nominal}")
 
         db = SessionLocal()
         try:
             if db.query(Donation).filter(Donation.saweria_id == saweria_id).first():
-                print(f"ℹ️ Donasi sudah ada: {saweria_id}")
+                print(f"ℹ️ Sudah ada: {saweria_id}")
                 return JSONResponse({"status": "already_exists"}, status_code=200)
 
             donasi = Donation(
@@ -136,7 +137,7 @@ async def saweria_webhook(
             db.add(donasi)
             db.commit()
 
-            print(f"✅ DONASI OTOMATIS MASUK → {nama} | Rp {nominal:,} | Pesan: {pesan or '-'}")
+            print(f"✅ DONASI MASUK → {nama} | Rp {nominal:,} | Pesan: {pesan or '-'}")
             return JSONResponse({"status": "success"})
 
         finally:
@@ -144,7 +145,7 @@ async def saweria_webhook(
 
     except Exception as e:
         print(f"❌ Webhook Error: {type(e).__name__} - {e}")
-        traceback.print_exc()   # Tampilkan error lengkap
+        traceback.print_exc()
         return JSONResponse({"status": "error", "detail": str(e)}, status_code=400)
 
 
@@ -200,7 +201,7 @@ async def serve_index():
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8080))
-    print(f"🚀 Server berjalan di http://0.0.0.0:{port}")
+    print(f"🚀 Server berjalan di http://0.0.0.0:{port} | Secret via ?secret=")
     uvicorn.run(
         app,
         host="0.0.0.0",
