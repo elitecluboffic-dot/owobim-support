@@ -6,10 +6,8 @@ from fastapi.responses import HTMLResponse, JSONResponse
 import asyncio
 import os
 from dotenv import load_dotenv
-from datetime import datetime
-
-# Import SQLAlchemy dengan benar
 from sqlalchemy import func
+
 from models import SessionLocal, Donation
 
 load_dotenv()
@@ -35,16 +33,8 @@ async def support(ctx):
         color=0xff6b35,
         url="https://advance.kraxx.my.id"
     )
-    embed.add_field(
-        name="🔗 Link Utama",
-        value="https://advance.kraxx.my.id",
-        inline=False
-    )
-    embed.add_field(
-        name="💸 Saweria",
-        value="https://saweria.co/teamowo",
-        inline=False
-    )
+    embed.add_field(name="🔗 Link Utama", value="https://advance.kraxx.my.id", inline=False)
+    embed.add_field(name="💸 Saweria", value="https://saweria.co/teamowo", inline=False)
     embed.set_footer(text="Terima kasih telah support OwoBim ❤️ • !support")
     
     await ctx.send(embed=embed)
@@ -54,15 +44,12 @@ async def support(ctx):
 async def saweria_webhook(request: Request):
     try:
         data = await request.json()
-        
         nama = data.get("donator_name", "Anonymous")
         nominal = int(data.get("amount_raw", 0))
         pesan = data.get("message")
         saweria_id = data.get("id")
 
         db = SessionLocal()
-
-        # Cegah duplikat
         if db.query(Donation).filter(Donation.saweria_id == saweria_id).first():
             db.close()
             return JSONResponse({"status": "already_exists"}, status_code=200)
@@ -77,9 +64,8 @@ async def saweria_webhook(request: Request):
         db.commit()
         db.close()
 
-        print(f"✅ Donasi baru masuk: {nama} - Rp {nominal:,}")
+        print(f"✅ Donasi masuk: {nama} - Rp {nominal:,}")
         return JSONResponse({"status": "success"})
-
     except Exception as e:
         print(f"❌ Webhook error: {e}")
         return JSONResponse({"status": "error"}, status_code=400)
@@ -126,21 +112,24 @@ async def serve_index():
         with open("static/index.html", "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
-        return HTMLResponse("<h1>index.html belum ditemukan di folder static/</h1>")
+        return HTMLResponse("<h1>index.html tidak ditemukan di folder static/</h1>")
+
+# ====================== STARTUP EVENT (PENTING!) ======================
+@app.on_event("startup")
+async def startup_event():
+    token = os.getenv("DISCORD_TOKEN")
+    if token:
+        print("🔄 Menjalankan Discord Bot...")
+        asyncio.create_task(bot.start(token))
+    else:
+        print("⚠️ DISCORD_TOKEN tidak ditemukan. Bot Discord tidak dijalankan.")
 
 # ====================== RUN ======================
 if __name__ == "__main__":
     import uvicorn
     
-    # Jalankan Discord bot di background (aman)
-    if os.getenv("DISCORD_TOKEN"):
-        asyncio.create_task(bot.start(os.getenv("DISCORD_TOKEN")))
-    else:
-        print("⚠️  DISCORD_TOKEN tidak ditemukan. Bot Discord tidak akan jalan.")
-
-    # Port dari Railway (WAJIB)
-    port = int(os.getenv("PORT", 8000))
-    print(f"🚀 Server mulai di port {port} | https://advance.kraxx.my.id")
+    port = int(os.getenv("PORT", 8080))   # Railway sering pakai 8080
+    print(f"🚀 Server berjalan di port {port}")
 
     uvicorn.run(
         app, 
