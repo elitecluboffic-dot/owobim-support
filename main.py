@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 import asyncio
 import os
+import traceback
 from dotenv import load_dotenv
 from sqlalchemy import func
 from contextlib import asynccontextmanager
@@ -27,10 +28,7 @@ async def verify_saweria_secret(
     if not SAWERIA_SECRET_KEY:
         return  # Mode development: skip proteksi
 
-    # Cek dari Header dulu
     secret = x_secret_key
-
-    # Kalau tidak ada di header, cek query parameter ?secret=
     if not secret:
         secret = request.query_params.get("secret")
 
@@ -83,32 +81,52 @@ async def support(ctx):
     embed.add_field(name="🔗 Link Utama", value="https://advance.kraxx.my.id", inline=False)
     embed.add_field(name="💸 Saweria", value="https://saweria.co/teamowo", inline=False)
     embed.set_footer(text="Terima kasih telah support OwoBim ❤️ • !support")
-
     await ctx.send(embed=embed)
 
 
-# ====================== SAWERIA WEBHOOK (DIPROTEKSI) ======================
+# ====================== SAWERIA WEBHOOK (FIXED & ROBUST) ======================
 @app.post("/saweria")
 async def saweria_webhook(
     request: Request,
-    _: str = Depends(verify_saweria_secret)   # Pakai dependency
+    _: str = Depends(verify_saweria_secret)
 ):
     try:
         data = await request.json()
 
-        nama = data.get("donator_name", "Anonymous")
-        nominal = int(data.get("amount_raw", 0))
-        pesan = data.get("message")
+        # === LOGGING FULL PAYLOAD (PENTING UNTUK DEBUG) ===
+        print("🔍 [SAWERIA WEBHOOK] Payload diterima:")
+        print(data)
+
+        # Ambil data dengan fallback yang lebih aman
         saweria_id = data.get("id")
+        nama = (
+            data.get("donator_name")
+            or data.get("donator")
+            or data.get("username")
+            or "Anonymous"
+        )
+
+        # Penanganan amount_raw yang lebih fleksibel
+        amount_raw = data.get("amount_raw") or data.get("amount")
+        if amount_raw is None:
+            nominal = 0
+        elif isinstance(amount_raw, str):
+            nominal = int(float(amount_raw.replace(",", "")))
+        else:
+            nominal = int(amount_raw)
+
+        pesan = data.get("message") or data.get("note") or data.get("pesan")
 
         if not saweria_id:
-            raise ValueError("Missing saweria_id in payload")
+            raise ValueError("Missing 'id' in Saweria payload")
+        if nominal <= 0:
+            raise ValueError(f"Invalid nominal: {nominal}")
 
         db = SessionLocal()
         try:
-            # Cek duplikat donasi
+            # Cek duplikat
             if db.query(Donation).filter(Donation.saweria_id == saweria_id).first():
-                print(f"ℹ️ Donasi sudah ada: {saweria_id}")
+                print(f"ℹ️ Donasi sudah ada (ID: {saweria_id})")
                 return JSONResponse({"status": "already_exists"}, status_code=200)
 
             donasi = Donation(
@@ -120,18 +138,22 @@ async def saweria_webhook(
             db.add(donasi)
             db.commit()
 
-            print(f"✅ Donasi masuk: {nama} - Rp {nominal:,} | Pesan: {pesan or '-'}")
+            print(f"✅ DONASI BERHASIL MASUK → {nama} | Rp {nominal:,} | Pesan: {pesan or '-'}")
             return JSONResponse({"status": "success"})
 
         finally:
             db.close()
 
     except Exception as e:
-        print(f"❌ Webhook error: {e}")
-        return JSONResponse({"status": "error", "detail": str(e)}, status_code=400)
+        print(f"❌ Webhook Error: {e}")
+        traceback.print_exc()   # Tampilkan error lengkap di console
+        return JSONResponse(
+            {"status": "error", "detail": str(e)}, 
+            status_code=400
+        )
 
 
-# ====================== API FOR WEBSITE (Tetap Terbuka) ======================
+# ====================== API FOR WEBSITE ======================
 @app.get("/api/saweria")
 async def get_donatur():
     db = SessionLocal()
@@ -166,7 +188,7 @@ async def get_donatur():
         db.close()
 
 
-# ====================== SERVE STATIC FILES ======================
+# ====================== STATIC FILES ======================
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
@@ -182,7 +204,6 @@ async def serve_index():
 # ====================== RUN ======================
 if __name__ == "__main__":
     import uvicorn
-
     port = int(os.getenv("PORT", 8080))
     print(f"🚀 Server berjalan di http://0.0.0.0:{port}")
     uvicorn.run(
