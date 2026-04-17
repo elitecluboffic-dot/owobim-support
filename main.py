@@ -84,7 +84,7 @@ async def support(ctx):
     await ctx.send(embed=embed)
 
 
-# ====================== SAWERIA WEBHOOK (FIXED & ROBUST) ======================
+# ====================== SAWERIA WEBHOOK - FINAL AUTO FIX ======================
 @app.post("/saweria")
 async def saweria_webhook(
     request: Request,
@@ -93,40 +93,38 @@ async def saweria_webhook(
     try:
         data = await request.json()
 
-        # === LOGGING FULL PAYLOAD (PENTING UNTUK DEBUG) ===
+        # LOG FULL PAYLOAD (INI YANG PALING PENTING)
         print("🔍 [SAWERIA WEBHOOK] Payload diterima:")
         print(data)
 
-        # Ambil data dengan fallback yang lebih aman
+        # Parsing yang lebih aman & fleksibel
         saweria_id = data.get("id")
+
         nama = (
-            data.get("donator_name")
-            or data.get("donator")
-            or data.get("username")
+            data.get("donator_name") 
+            or data.get("donator") 
+            or data.get("username") 
             or "Anonymous"
         )
 
-        # Penanganan amount_raw yang lebih fleksibel
+        # Handle nominal (bisa string atau number)
         amount_raw = data.get("amount_raw") or data.get("amount")
-        if amount_raw is None:
-            nominal = 0
-        elif isinstance(amount_raw, str):
-            nominal = int(float(amount_raw.replace(",", "")))
+        if isinstance(amount_raw, str):
+            nominal = int(float(str(amount_raw).replace(",", "")))
         else:
-            nominal = int(amount_raw)
+            nominal = int(amount_raw) if amount_raw is not None else 0
 
-        pesan = data.get("message") or data.get("note") or data.get("pesan")
+        pesan = data.get("message") or data.get("note") or ""
 
         if not saweria_id:
             raise ValueError("Missing 'id' in Saweria payload")
         if nominal <= 0:
-            raise ValueError(f"Invalid nominal: {nominal}")
+            raise ValueError(f"Nominal tidak valid: {nominal}")
 
         db = SessionLocal()
         try:
-            # Cek duplikat
             if db.query(Donation).filter(Donation.saweria_id == saweria_id).first():
-                print(f"ℹ️ Donasi sudah ada (ID: {saweria_id})")
+                print(f"ℹ️ Donasi sudah ada: {saweria_id}")
                 return JSONResponse({"status": "already_exists"}, status_code=200)
 
             donasi = Donation(
@@ -138,19 +136,16 @@ async def saweria_webhook(
             db.add(donasi)
             db.commit()
 
-            print(f"✅ DONASI BERHASIL MASUK → {nama} | Rp {nominal:,} | Pesan: {pesan or '-'}")
+            print(f"✅ DONASI OTOMATIS MASUK → {nama} | Rp {nominal:,} | Pesan: {pesan or '-'}")
             return JSONResponse({"status": "success"})
 
         finally:
             db.close()
 
     except Exception as e:
-        print(f"❌ Webhook Error: {e}")
-        traceback.print_exc()   # Tampilkan error lengkap di console
-        return JSONResponse(
-            {"status": "error", "detail": str(e)}, 
-            status_code=400
-        )
+        print(f"❌ Webhook Error: {type(e).__name__} - {e}")
+        traceback.print_exc()   # Tampilkan error lengkap
+        return JSONResponse({"status": "error", "detail": str(e)}, status_code=400)
 
 
 # ====================== API FOR WEBSITE ======================
