@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from fastapi import FastAPI, Request, Depends, HTTPException, status
+from fastapi import FastAPI, Request, HTTPException, status, Header
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 import asyncio
@@ -15,18 +15,25 @@ load_dotenv()
 
 # ====================== SECRET KEY ======================
 SAWERIA_SECRET_KEY = os.getenv("SAWERIA_SECRET_KEY")
-if not SAWERIA_SECRET_KEY:
-    print("⚠️ WARNING: SAWERIA_SECRET_KEY tidak ditemukan di .env!")
 
-# Dependency untuk verifikasi secret
-async def verify_saweria_secret(x_secret_key: str = Depends(lambda: None)):
-    # Ambil dari header (bisa juga pakai Header(...) biar lebih strict)
+if not SAWERIA_SECRET_KEY:
+    print("⚠️  WARNING: SAWERIA_SECRET_KEY tidak ditemukan di .env!")
+    print("    Webhook Saweria tidak akan terproteksi!")
+
+# Dependency untuk verifikasi secret (Header)
+async def verify_saweria_secret(
+    x_secret_key: str = Header(None, alias="X-Secret-Key")
+):
+    if not SAWERIA_SECRET_KEY:
+        return  # Jika secret belum di-set, skip pengecekan (mode development)
+    
     if not x_secret_key or x_secret_key != SAWERIA_SECRET_KEY:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or missing secret key"
+            detail="Unauthorized: Invalid or missing X-Secret-Key"
         )
     return x_secret_key
+
 
 # ====================== LIFESPAN ======================
 @asynccontextmanager
@@ -40,6 +47,7 @@ async def lifespan(app: FastAPI):
     
     yield
     print("🛑 Server sedang shutdown...")
+
 
 # ====================== FASTAPI ======================
 app = FastAPI(title="OwoBim Support", lifespan=lifespan)
@@ -68,12 +76,20 @@ async def support(ctx):
     
     await ctx.send(embed=embed)
 
+
 # ====================== SAWERIA WEBHOOK (DIPROTEKSI) ======================
 @app.post("/saweria")
 async def saweria_webhook(
     request: Request,
-    secret: str = Depends(verify_saweria_secret)   # <-- proteksi di sini
+    x_secret_key: str = Header(None, alias="X-Secret-Key")   # Header wajib
 ):
+    # Cek secret key
+    if SAWERIA_SECRET_KEY and (not x_secret_key or x_secret_key != SAWERIA_SECRET_KEY):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized: Invalid or missing X-Secret-Key"
+        )
+
     try:
         data = await request.json()
         nama = data.get("donator_name", "Anonymous")
@@ -82,25 +98,28 @@ async def saweria_webhook(
         saweria_id = data.get("id")
 
         db = SessionLocal()
-        if db.query(Donation).filter(Donation.saweria_id == saweria_id).first():
+        try:
+            if db.query(Donation).filter(Donation.saweria_id == saweria_id).first():
+                return JSONResponse({"status": "already_exists"}, status_code=200)
+
+            donasi = Donation(
+                saweria_id=saweria_id,
+                nama=nama,
+                nominal=nominal,
+                pesan=pesan
+            )
+            db.add(donasi)
+            db.commit()
+
+            print(f"✅ Donasi masuk: {nama} - Rp {nominal:,}")
+            return JSONResponse({"status": "success"})
+        finally:
             db.close()
-            return JSONResponse({"status": "already_exists"}, status_code=200)
 
-        donasi = Donation(
-            saweria_id=saweria_id,
-            nama=nama,
-            nominal=nominal,
-            pesan=pesan
-        )
-        db.add(donasi)
-        db.commit()
-        db.close()
-
-        print(f"✅ Donasi masuk: {nama} - Rp {nominal:,}")
-        return JSONResponse({"status": "success"})
     except Exception as e:
         print(f"❌ Webhook error: {e}")
         return JSONResponse({"status": "error"}, status_code=400)
+
 
 # ====================== API FOR WEBSITE (Tetap Terbuka) ======================
 @app.get("/api/saweria")
@@ -116,14 +135,15 @@ async def get_donatur():
          .order_by(func.sum(Donation.nominal).desc())\
          .all()
 
-        donatur_list = []
-        for row in results:
-            donatur_list.append({
+        donatur_list = [
+            {
                 "nama": row.nama,
                 "nominal": int(row.total_nominal),
                 "pesan": row.last_pesan,
                 "createdAt": row.last_date.isoformat() if row.last_date else None
-            })
+            }
+            for row in results
+        ]
 
         grand_total = sum(d["nominal"] for d in donatur_list)
 
@@ -135,7 +155,8 @@ async def get_donatur():
     finally:
         db.close()
 
-# ====================== SERVE HTML ======================
+
+# ====================== SERVE STATIC FILES ======================
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/", response_class=HTMLResponse)
@@ -145,6 +166,7 @@ async def serve_index():
             return f.read()
     except FileNotFoundError:
         return HTMLResponse("<h1>index.html tidak ditemukan di folder static/</h1>")
+
 
 # ====================== RUN ======================
 if __name__ == "__main__":
