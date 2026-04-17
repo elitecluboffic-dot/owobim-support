@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Support OwoBim</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #0d0d10;
+      --surface: #141418;
+      --surface2: #1c1c22;
+      --orange: #ff6b35;
+      --orange2: #ff9a5c;
+      --gold: #ffd166;
+      --teal: #06d6a0;
+      --purple: #a78bfa;
+      --text: #f0ede8;
+      --muted: #6b6878;
+      --border: rgba(255,107,53,0.15);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    /* ── NOISE OVERLAY ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 0; opacity: 0.4;
+    }
+    /* ── GLOW BG ── */
+    .bg-glow {
+      position: fixed; top: -200px; left: 50%; transform: translateX(-50%);
+      width: 900px; height: 600px;
+      background: radial-gradient(ellipse at center, rgba(255,107,53,0.12) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    .bg-glow2 {
+      position: fixed; bottom: -100px; right: -200px;
+      width: 600px; height: 600px;
+      background: radial-gradient(ellipse at center, rgba(167,139,250,0.08) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    /* ── WRAPPER ── */
+    .wrapper {
+      position: relative; z-index: 1;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 60px 24px 100px;
+    }
+    /* ── HEADER ── */
+    header {
+      text-align: center;
+      margin-bottom: 64px;
+      animation: fadeUp 0.8s ease both;
+    }
+    .logo-badge {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: rgba(255,107,53,0.1);
+      border: 1px solid rgba(255,107,53,0.25);
+      border-radius: 999px;
+      padding: 8px 20px;
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      color: var(--orange);
+      margin-bottom: 28px;
+      letter-spacing: 0.05em;
+    }
+    header h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(40px, 8vw, 72px);
+      font-weight: 800;
+      line-height: 1.0;
+      background: linear-gradient(135deg, var(--text) 0%, var(--orange2) 50%, var(--gold) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 16px;
+    }
+    header p {
+      font-size: 17px;
+      color: var(--muted);
+      max-width: 440px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+    header p span { color: var(--text); font-weight: 500; }
+    /* ── STAT STRIP ── */
+    .stats {
+      display: flex; gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 48px;
+      animation: fadeUp 0.8s 0.1s ease both;
+    }
+    .stat {
+      flex: 1; background: var(--surface);
+      padding: 24px 20px;
+      text-align: center;
+    }
+    .stat-val {
+      font-family: 'Syne', sans-serif;
+      font-size: 26px; font-weight: 800;
+      color: var(--orange);
+    }
+    .stat-lbl { font-size: 12px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.08em; }
+    /* ── SECTION HEADING ── */
+    .sec-head {
+      display: flex; align-items: center; gap: 12px;
+      font-family: 'Space Mono', monospace;
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+    .sec-head::after {
+      content: ''; flex: 1;
+      height: 1px; background: var(--border);
+    }
+    /* ── TIER CARDS ── */
+    .tiers {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 48px;
+      animation: fadeUp 0.8s 0.2s ease both;
+    }
+    .tier-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 22px 18px;
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+      cursor: default;
+    }
+    .tier-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--orange);
+      box-shadow: 0 8px 32px rgba(255,107,53,0.15);
+    }
+    .tier-emoji { font-size: 28px; margin-bottom: 10px; display: block; }
+    .tier-name {
+      font-family: 'Syne', sans-serif;
+      font-size: 15px; font-weight: 800;
+      margin-bottom: 4px;
+    }
+    .tier-price {
+      font-family: 'Space Mono', monospace;
+      font-size: 13px; color: var(--orange);
+      margin-bottom: 10px;
+    }
+    .tier-perks { list-style: none; }
+    .tier-perks li {
+      font-size: 12px; color: var(--muted);
+      padding: 3px 0;
+    }
+    .tier-perks li::before { content: '→ '; color: var(--orange); }
+    .tier-card.featured {
+      background: linear-gradient(135deg, rgba(255,107,53,0.12), rgba(255,154,92,0.06));
+      border-color: var(--orange);
+      position: relative; overflow: hidden;
+    }
+    .tier-card.featured::after {
+      content: 'POPULER';
+      position: absolute; top: 12px; right: -22px;
+      background: var(--orange);
+      color: #fff;
+      font-family: 'Space Mono', monospace;
+      font-size: 9px; font-weight: 700;
+      padding: 3px 28px;
+      transform: rotate(35deg);
+      letter-spacing: 0.1em;
+    }
+    /* ── HOW TO DONATE ── */
+    .how {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      margin-bottom: 48px;
+      animation: fadeUp 0.8s 0.3s ease both;
+    }
+    .steps { display: flex; flex-direction: column; gap: 0; }
+    .step {
+      display: flex; align-items: flex-start; gap: 20px;
+      padding: 18px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .step:last-child { border-bottom: none; padding-bottom: 0; }
+    .step-num {
+      width: 36px; height: 36px; flex-shrink: 0;
+      background: rgba(255,107,53,0.12);
+      border: 1px solid rgba(255,107,53,0.3);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Space Mono', monospace;
+      font-size: 13px; font-weight: 700;
+      color: var(--orange);
+    }
+    .step-body h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .step-body p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .step-body a {
+      color: var(--orange); text-decoration: none;
+      font-family: 'Space Mono', monospace; font-size: 12px;
+    }
+    .step-body a:hover { text-decoration: underline; }
+    /* ── DONATUR LIST ── */
+    .donatur-section {
+      animation: fadeUp 0.8s 0.4s ease both;
+      margin-bottom: 48px;
+    }
+    #donatur-list {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+    }
+    .donatur-item {
+      display: flex; align-items: center; gap: 16px;
+      padding: 16px 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      transition: background 0.15s;
+    }
+    .donatur-item:last-child { border-bottom: none; }
+    .donatur-item:hover { background: rgba(255,107,53,0.04); }
+    .donatur-rank {
+      font-family: 'Space Mono', monospace;
+      font-size: 12px; color: var(--muted);
+      width: 24px; flex-shrink: 0;
+    }
+    .donatur-emoji { font-size: 20px; flex-shrink: 0; }
+    .donatur-info { flex: 1; min-width: 0; }
+    .donatur-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .donatur-msg { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .donatur-right { text-align: right; flex-shrink: 0; }
+    .donatur-amount {
+      font-family: 'Space Mono', monospace;
+      font-size: 13px; color: var(--teal); font-weight: 700;
+    }
+    .donatur-date { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .empty-state {
+      padding: 48px 24px; text-align: center;
+      color: var(--muted); font-size: 14px;
+    }
+    .empty-state span { display: block; font-size: 36px; margin-bottom: 12px; }
+    .loading-row {
+      padding: 48px; text-align: center; color: var(--muted); font-size: 13px;
+      font-family: 'Space Mono', monospace;
+    }
+    .loading-row::after {
+      content: ''; display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--orange);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-left: 10px; vertical-align: middle;
+    }
+    /* ── CTA ── */
+    .cta-box {
+      text-align: center;
+      background: linear-gradient(135deg, rgba(255,107,53,0.1) 0%, rgba(255,209,102,0.06) 100%);
+      border: 1px solid rgba(255,107,53,0.25);
+      border-radius: 24px;
+      padding: 48px 32px;
+      animation: fadeUp 0.8s 0.5s ease both;
+    }
+    .cta-box h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: 32px; font-weight: 800;
+      margin-bottom: 10px;
+    }
+    .cta-box p { color: var(--muted); font-size: 15px; margin-bottom: 28px; }
+    .btn-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 14px 28px;
+      border-radius: 12px;
+      font-size: 14px; font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+      cursor: pointer; border: none; outline: none;
+    }
+    .btn-primary {
+      background: var(--orange);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(255,107,53,0.35);
+    }
+    .btn-primary:hover {
+      background: var(--orange2);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(255,107,53,0.45);
+    }
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-ghost:hover {
+      border-color: var(--orange);
+      color: var(--orange);
+      transform: translateY(-2px);
+    }
+    /* ── FOOTER ── */
+    footer {
+      text-align: center;
+      margin-top: 60px;
+      color: var(--muted);
+      font-size: 12px;
+      font-family: 'Space Mono', monospace;
+      letter-spacing: 0.04em;
+    }
+    footer a { color: var(--orange); text-decoration: none; }
+    /* ── TOAST ── */
+    #toast {
+      position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 22px;
+      font-size: 13px; color: var(--text);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      transition: transform 0.3s ease;
+      pointer-events: none; z-index: 999;
+      white-space: nowrap;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+    /* ── TOTAL BAR ── */
+    .total-bar {
+      background: var(--surface2);
+      border-top: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .total-bar span { font-size: 13px; color: var(--muted); }
+    .total-val {
+      font-family: 'Space Mono', monospace;
+      font-size: 14px; color: var(--teal); font-weight: 700;
+    }
+    /* ── ANIMATIONS ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    /* ── RESPONSIVE ── */
+    @media (max-width: 540px) {
+      .stats { flex-direction: column; }
+      .tiers { grid-template-columns: 1fr 1fr; }
+      .how { padding: 20px; }
+      .cta-box { padding: 32px 20px; }
+      .btn { padding: 12px 20px; font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+<div class="bg-glow"></div>
+<div class="bg-glow2"></div>
+<div class="wrapper">
+  <!-- HEADER -->
+  <header>
+    <div class="logo-badge">☕ owobim.kraxx.my.id</div>
+    <h1>Support<br/>OwoBim</h1>
+    <p>Bot ini gratis & terus dikembangin oleh <span>Bimxr</span>. Setiap donasi sangat berarti buat kelangsungan bot ini! 🙏</p>
+  </header>
+
+  <!-- STATS -->
+  <div class="stats" id="stats-strip">
+    <div class="stat">
+      <div class="stat-val" id="stat-total">—</div>
+      <div class="stat-lbl">Total Donasi</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="stat-count">—</div>
+      <div class="stat-lbl">Donatur</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val">🟢</div>
+      <div class="stat-lbl">Bot Status</div>
+    </div>
+  </div>
+
+  <!-- TIERS -->
+  <div class="sec-head">🎁 Benefit Donasi</div>
+  <div class="tiers">
+    <!-- Tier cards tetap sama -->
+    <div class="tier-card">
+      <span class="tier-emoji">☕</span>
+      <div class="tier-name">Kopi</div>
+      <div class="tier-price">Rp 10.000+</div>
+      <ul class="tier-perks">
+        <li>Nama di list donatur</li>
+        <li>Terima kasih spesial</li>
+      </ul>
+    </div>
+    <div class="tier-card">
+      <span class="tier-emoji">⭐</span>
+      <div class="tier-name">Bintang</div>
+      <div class="tier-price">Rp 30.000+</div>
+      <ul class="tier-perks">
+        <li>Nama di list donatur</li>
+        <li>Role spesial di server</li>
+      </ul>
+    </div>
+    <div class="tier-card featured">
+      <span class="tier-emoji">💎</span>
+      <div class="tier-name">Diamond</div>
+      <div class="tier-price">Rp 50.000+</div>
+      <ul class="tier-perks">
+        <li>Semua benefit ⭐</li>
+        <li>Pro fitur langsung</li>
+      </ul>
+    </div>
+    <div class="tier-card">
+      <span class="tier-emoji">👑</span>
+      <div class="tier-name">Crown</div>
+      <div class="tier-price">Rp 100.000+</div>
+      <ul class="tier-perks">
+        <li>Semua benefit 💎</li>
+        <li>Akses eksklusif</li>
+      </ul>
+    </div>
+    <div class="tier-card">
+      <span class="tier-emoji">🚀</span>
+      <div class="tier-name">Rocket</div>
+      <div class="tier-price">Rp 500.000+</div>
+      <ul class="tier-perks">
+        <li>Semua benefit 👑</li>
+        <li>Shoutout di Discord</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- HOW TO -->
+  <div class="sec-head">💸 Cara Donasi</div>
+  <div class="how">
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <div class="step-body">
+          <h4>Buka Saweria</h4>
+          <p>Kunjungi halaman donasi di <a href="https://saweria.co/teamowo" target="_blank">saweria.co/teamowo</a></p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <div class="step-body">
+          <h4>Masukkan Nominal</h4>
+          <p>Pilih tier yang kamu mau atau masukkan nominal custom sesuai kemampuan.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <div class="step-body">
+          <h4>Isi Nama & Pesan</h4>
+          <p>Masukkan nama Discord kamu supaya bisa kita tambahkan ke list donatur.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">04</div>
+        <div class="step-body">
+          <h4>Konfirmasi Benefit</h4>
+          <p>Setelah donasi, DM <a href="https://discord.com/users/bimxr" target="_blank">@bimxr</a> di Discord untuk klaim benefit kamu.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP DONATUR -->
+  <div class="donatur-section">
+    <div class="sec-head">🏆 Top Donatur</div>
+    <div id="donatur-list">
+      <div class="loading-row">Memuat donatur...</div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta-box">
+    <h2>Yuk Support OwoBim! ☕</h2>
+    <p>Setiap donasi, sekecil apapun, sangat membantu pengembangan bot ini terus berjalan.</p>
+    <div class="btn-row">
+      <a class="btn btn-primary" href="https://saweria.co/teamowo" target="_blank">☕ Donate via Saweria</a>
+      <a class="btn btn-ghost" href="https://advance.kraxx.my.id" target="_blank">🌐 Website</a>
+    </div>
+  </div>
+
+  <footer>
+    <p>OwoBim &bull; Made with 💙 by <a href="#">Bimxr</a> &bull; <a href="https://discord.gg/jHv69FHd" target="_blank">Discord Server</a></p>
+    <p style="margin-top:8px; opacity:0.5;">Powered by OwoBim 2026</p>
+  </footer>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+  const API = '/api/saweria';
+
+  function tierEmoji(n) {
+    n = parseInt(n);
+    if (n >= 100000) return '🚀';
+    if (n >= 50000) return '👑';
+    if (n >= 25000) return '💎';
+    if (n >= 10000) return '⭐';
+    return '☕';
+  }
+
+  function formatRupiah(n) {
+    return 'Rp ' + parseInt(n).toLocaleString('id-ID');
+  }
+
+  function formatDate(ts) {
+    if (!ts) return '-';
+    return new Date(ts).toLocaleDateString('id-ID', { 
+      day: '2-digit', 
+      month: 'short', 
+      year: 'numeric' 
+    });
+  }
+
+  async function loadDonatur() {
+    const list = document.getElementById('donatur-list');
+    try {
+      const res = await fetch(API);
+      if (!res.ok) throw new Error('fetch failed');
+
+      const data = await res.json();
+      
+      // Support format baru dari backend
+      const donaturList = data.list || [];
+      const total = data.total_donasi || 0;
+      const count = data.total_donatur || donaturList.length;
+
+      // Update stats
+      document.getElementById('stat-total').textContent = formatRupiah(total);
+      document.getElementById('stat-count').textContent = count;
+
+      if (donaturList.length === 0) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <span>☕</span>
+            Belum ada donatur. Jadilah yang pertama!
+          </div>`;
+        return;
+      }
+
+      const items = donaturList.slice(0, 10).map((d, i) => `
+        <div class="donatur-item" style="animation: fadeUp 0.4s ${i * 0.06}s ease both; opacity:0">
+          <span class="donatur-rank">#${i + 1}</span>
+          <span class="donatur-emoji">${tierEmoji(d.nominal)}</span>
+          <div class="donatur-info">
+            <div class="donatur-name">${d.nama || 'Anonymous'}</div>
+            ${d.pesan ? `<div class="donatur-msg">"${d.pesan}"</div>` : ''}
+          </div>
+          <div class="donatur-right">
+            <div class="donatur-amount">${formatRupiah(d.nominal)}</div>
+            <div class="donatur-date">${formatDate(d.createdAt)}</div>
+          </div>
+        </div>
+      `).join('');
+
+      list.innerHTML = `
+        ${items}
+        <div class="total-bar">
+          <span>Total terkumpul dari ${count} donatur</span>
+          <span class="total-val">${formatRupiah(total)}</span>
+        </div>`;
+    } catch (e) {
+      console.error(e);
+      document.getElementById('stat-total').textContent = 'N/A';
+      document.getElementById('stat-count').textContent = '0';
+      list.innerHTML = `
+        <div class="empty-state">
+          <span>🔌</span>
+          Gagal memuat donatur. Coba refresh halaman.
+        </div>`;
+    }
+  }
+
+  // Load saat halaman dibuka
+  loadDonatur();
+</script>
+</body>
+</html>
